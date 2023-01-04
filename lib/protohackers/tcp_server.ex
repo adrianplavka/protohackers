@@ -36,8 +36,8 @@ defmodule Protohackers.TCPServer do
   @impl true
   def handle_info({:tcp, socket, data}, {socket, transport} = state) do
     :ok = transport.send(socket, data)
-    transport.close(socket)
-    {:stop, :shutdown, state}
+    :ok = transport.setopts(socket, active: :once)
+    {:noreply, state}
   end
 
   @impl true
