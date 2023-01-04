@@ -1,4 +1,4 @@
-FROM elixir:1.14-otp-24 AS builder
+FROM hexpm/elixir:1.14.2-erlang-24.3.4.7-debian-bullseye-20221219 AS builder
 
 ENV MIX_ENV="prod"
 
@@ -33,4 +33,5 @@ WORKDIR /app
 
 COPY --from=builder /app/_build/prod/rel ./
 
+EXPOSE 5000
 CMD /app/protohackers/bin/protohackers start
