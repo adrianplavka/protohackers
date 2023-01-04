@@ -41,8 +41,19 @@ defmodule Protohackers.TCPServer do
   end
 
   @impl true
-  def handle_info(_, {socket, transport} = state) do
+  def handle_info({:tcp_closed, socket}, {socket, transport} = state) do
     transport.close(socket)
     {:stop, :shutdown, state}
+  end
+
+  @impl true
+  def handle_info({:tcp_error, socket, _reason}, {socket, transport} = state) do
+    transport.close(socket)
+    {:stop, :shutdown, state}
+  end
+
+  @impl true
+  def handle_info(_, state) do
+    {:noreply, state}
   end
 end
