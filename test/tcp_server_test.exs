@@ -10,14 +10,10 @@ defmodule Protohackers.TcpServerTest do
     {:ok, socket: socket}
   end
 
-  test "should echo the same contents back multiple times", %{socket: socket} do
+  test "should successfully send & receive data", %{socket: socket} do
     content = "test"
 
-    Enum.each(1..5, fn _ ->
-      assert :ok = :gen_tcp.send(socket, content)
-      assert {:ok, reply} = :gen_tcp.recv(socket, 0)
-
-      assert reply == to_charlist(content)
-    end)
+    assert :ok = :gen_tcp.send(socket, content)
+    assert {:ok, _} = :gen_tcp.recv(socket, 0)
   end
 end

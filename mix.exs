@@ -21,7 +21,10 @@ defmodule Protohackers.MixProject do
 
   defp deps do
     [
-      {:ranch, "~> 2.1"}
+      {:ecto, "~> 3.9"},
+      {:jason, "~> 1.4"},
+      {:ranch, "~> 2.1"},
+      {:stream_data, "~> 0.5", only: :test}
     ]
   end
 

@@ -8,7 +8,7 @@ defmodule Protohackers.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Protohackers.TCPServer, port: @port}
+      {Protohackers.TcpServer, port: @port, callback_module: Protohackers.Prime.Callback}
     ]
 
     opts = [strategy: :one_for_one, name: Protohackers.Supervisor]
