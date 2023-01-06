@@ -24,7 +24,8 @@ defmodule Protohackers.MixProject do
       {:ecto, "~> 3.9"},
       {:jason, "~> 1.4"},
       {:ranch, "~> 2.1"},
-      {:stream_data, "~> 0.5", only: :test}
+      {:stream_data, "~> 0.5", only: :test},
+      {:thousand_island, "~> 0.5.14"}
     ]
   end
 

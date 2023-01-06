@@ -3,10 +3,20 @@ defmodule Protohackers.Prime do
   Module for defining logic around prime numbers.
   """
 
-  @spec is_prime(number) :: boolean
-  def is_prime(number) do
-    Enum.any?(2..trunc(:math.sqrt(number)), fn x ->
-      rem(x, 2) == 0
-    end)
+  @spec prime?(number) :: boolean
+  def prime?(number)
+
+  def prime?(number) when is_float(number), do: false
+  def prime?(number) when number <= 1, do: false
+  def prime?(number) when number in [2, 3], do: true
+
+  def prime?(number) do
+    floored_sqrt =
+      number
+      |> :math.sqrt()
+      |> Float.floor()
+      |> round()
+
+    not Enum.any?(2..floored_sqrt, &(rem(number, &1) == 0))
   end
 end

@@ -7,8 +7,8 @@
 # General application configuration
 import Config
 
-# Configure the port on which the TCP server will be listening on.
-config :protohackers, port: 5000
+# Configure options for the TCP server.
+config :protohackers, tcp_options: [port: 5000]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

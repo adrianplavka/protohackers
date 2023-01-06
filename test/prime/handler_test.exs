@@ -1,16 +1,16 @@
-defmodule Protohackers.Prime.CallbackTest do
+defmodule Protohackers.Prime.HandlerTest do
   use ExUnit.Case
   use ExUnitProperties
 
   import Protohackers.Prime
-  import Protohackers.Prime.Callback
+  import Protohackers.Prime.Handler
 
   property "should return conforming response for a valid payload" do
     check all number <- integer(1..10000) do
-      is_number_prime = is_prime(number)
+      is_number_prime = prime?(number)
       payload = Jason.encode!(%{"method" => "isPrime", "number" => number})
 
-      assert {:continue, response} = handle_data(payload)
+      assert {:continue, response} = handle_payload(payload)
       assert %{"method" => "isPrime", "prime" => ^is_number_prime} = Jason.decode!(response)
     end
   end
@@ -25,22 +25,22 @@ defmodule Protohackers.Prime.CallbackTest do
       response =
         cond do
           not formedJson? ->
-            handle_data("{}")
+            handle_payload("{}")
 
           not requiredFields? ->
-            handle_data(Jason.encode!(%{"number" => number}))
+            handle_payload(Jason.encode!(%{"number" => number}))
 
           not allowedMethod? ->
-            handle_data(Jason.encode!(%{"method" => "isNotPrime", "number" => number}))
+            handle_payload(Jason.encode!(%{"method" => "isNotPrime", "number" => number}))
 
           not number? ->
-            handle_data(Jason.encode!(%{"method" => "isPrime", "number" => string}))
+            handle_payload(Jason.encode!(%{"method" => "isPrime", "number" => string}))
 
           true ->
-            handle_data("{}")
+            handle_payload("{}")
         end
 
-      assert {:stop, _} = response
+      assert {:close, _} = response
     end
   end
 end
