@@ -15,31 +15,27 @@ defmodule Protohackers.Assets.Handler do
 
   @impl ThousandIsland.Handler
   def handle_data(data, socket, state) do
-    load_data(data, socket, state)
-  end
-
-  defp load_data(data, socket, state) do
     case state.buffer <> data do
       <<payload::binary-size(9)>> ->
-        handle_payload(payload, socket, state)
+        Process.send(self(), {:payload, payload}, [])
+        {:continue, %{state | buffer: ""}}
 
       <<payload::binary-size(9), rest::binary>> ->
-        case handle_payload(payload, socket, state) do
-          {:continue, state} -> load_data(rest, socket, state)
-          other -> other
-        end
+        Process.send(self(), {:payload, payload}, [])
+        handle_data(rest, socket, %{state | buffer: ""})
 
       data ->
         {:continue, %{state | buffer: data}}
     end
   end
 
-  defp handle_payload(payload, socket, state) do
+  @impl GenServer
+  def handle_info({:payload, payload}, {socket, state}) do
     case decode_payload(payload) do
       {:ok, :insert, timestamp, price} ->
         Logger.info("Inserting payload: timestamp #{timestamp}, price #{price}")
         query_map = QueryMap.insert(state.query_map, timestamp, price)
-        {:continue, %{state | buffer: <<>>, query_map: query_map}}
+        {:noreply, {socket, %{state | query_map: query_map}}}
 
       {:ok, :query, min_timestamp, max_timestamp} ->
         Logger.info(
@@ -52,12 +48,12 @@ defmodule Protohackers.Assets.Handler do
         mean_price = floor(total_price / max(QueryMap.length(query_map), 1))
 
         Socket.send(socket, <<mean_price::size(32)>>)
-        {:continue, %{state | buffer: <<>>}}
+        {:noreply, {socket, state}}
 
       :error ->
         Logger.info("Unknown payload: #{inspect(payload)}")
         Socket.close(socket)
-        {:close, state}
+        {:stop, :shutdown, {socket, state}}
     end
   end
 
