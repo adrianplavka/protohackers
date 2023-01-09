@@ -60,10 +60,4 @@ defmodule Protohackers.BudgetChat.Handler do
     length = String.length(username)
     length > 0 and length <= 16 and alphanumeric?(username)
   end
-
-  defp with_newline(data),
-    do: data <> "\n"
-
-  defp without_newline(data),
-    do: data |> String.replace("\n", "") |> String.replace("\r", "")
 end

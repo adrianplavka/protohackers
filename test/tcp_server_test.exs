@@ -136,7 +136,4 @@ defmodule Protohackers.TcpServerTest do
   defp tcp_send(socket, data) do
     :gen_tcp.send(socket, data)
   end
-
-  defp with_newline(data),
-    do: data <> "\n"
 end
