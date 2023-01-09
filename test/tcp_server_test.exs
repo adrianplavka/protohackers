@@ -1,62 +1,142 @@
 defmodule Protohackers.TcpServerTest do
   use ExUnit.Case
+  use ExUnitProperties
+
+  import Protohackers.Utils
 
   @tcp_options Application.compile_env!(:protohackers, :tcp_options)
   @port Keyword.fetch!(@tcp_options, :port)
 
-  setup do
-    {:ok, socket} = :gen_tcp.connect('localhost', @port, active: false)
-    on_exit(fn -> :gen_tcp.close(socket) end)
+  test "should connect & be greeted" do
+    assert {:ok, socket} = tcp_connect()
+    tcp_disconnect_on_exit(socket)
 
-    {:ok, socket: socket}
+    assert {:ok, msg} = tcp_recv(socket)
+    assert msg =~ "Welcome"
   end
 
-  test "should successfully send & receive data", %{socket: socket} do
-    insert_content = create_insert_payload(12345, 101)
-    assert :ok = :gen_tcp.send(socket, insert_content)
+  test "should timeout after inactivity" do
+    assert {:ok, socket} = tcp_connect()
+    tcp_disconnect_on_exit(socket)
 
-    insert_content = create_insert_payload(12346, 102)
-    assert :ok = :gen_tcp.send(socket, insert_content)
-
-    insert_content = create_insert_payload(12347, 100)
-    assert :ok = :gen_tcp.send(socket, insert_content)
-
-    insert_content = create_insert_payload(40960, 5)
-    assert :ok = :gen_tcp.send(socket, insert_content)
-
-    query_content = create_query_payload(12288, 16384)
-    assert :ok = :gen_tcp.send(socket, query_content)
-
-    assert {:ok, [0x00, 0x00, 0x00, 0x65]} = :gen_tcp.recv(socket, 0)
+    assert {:ok, _} = tcp_recv(socket)
+    assert {:error, :closed} = tcp_recv(socket)
   end
 
-  test "should timeout after inactivity", %{socket: socket} do
-    assert {:error, :closed} = :gen_tcp.recv(socket, 0)
+  test "should handle a valid username" do
+    assert {:ok, socket} = tcp_connect()
+    tcp_disconnect_on_exit(socket)
+
+    assert {:ok, _} = tcp_recv(socket)
+
+    assert :ok = tcp_send(socket, with_newline("voyage"))
+    assert {:ok, msg} = tcp_recv(socket)
+
+    assert msg =~ "The room contains"
   end
 
-  test "should handle partial data", %{socket: socket} do
-    assert :ok = :gen_tcp.send(socket, "I")
-    assert :ok = :gen_tcp.send(socket, <<0>>)
-    assert :ok = :gen_tcp.send(socket, <<0>>)
-    assert :ok = :gen_tcp.send(socket, "0")
-    assert :ok = :gen_tcp.send(socket, "9")
-    :timer.sleep(10)
-    assert :ok = :gen_tcp.send(socket, <<0>>)
-    assert :ok = :gen_tcp.send(socket, <<0>>)
-    assert :ok = :gen_tcp.send(socket, "0")
-    assert :ok = :gen_tcp.send(socket, "0")
+  property "should handle & disconnect an invalid username" do
+    check all username <- filter(string(:printable), fn x -> not alphanumeric?(x) end) do
+      assert {:ok, socket} = tcp_connect()
+      tcp_disconnect_on_exit(socket)
 
-    query_content = create_query_payload(0, 20000)
-    assert :ok = :gen_tcp.send(socket, query_content)
-
-    assert {:ok, [0, 0, 48, 48]} = :gen_tcp.recv(socket, 0)
+      assert {:ok, _} = tcp_recv(socket)
+      assert :ok = tcp_send(socket, with_newline(username))
+      assert {:error, :closed} = tcp_recv(socket)
+    end
   end
 
-  defp create_insert_payload(timestamp, price) do
-    <<"I", timestamp::size(32), price::size(32)>>
+  test "should handle multiple users & output room list w/ new joined user message" do
+    assert {:ok, socket1} = tcp_connect()
+    tcp_disconnect_on_exit(socket1)
+
+    assert {:ok, _} = tcp_recv(socket1)
+    assert :ok = tcp_send(socket1, with_newline("voyage"))
+    assert {:ok, _} = tcp_recv(socket1)
+
+    assert {:ok, socket2} = tcp_connect()
+    tcp_disconnect_on_exit(socket2)
+
+    assert {:ok, _} = tcp_recv(socket2)
+    assert :ok = tcp_send(socket2, with_newline("haxius"))
+    assert {:ok, msg} = tcp_recv(socket2)
+
+    assert msg =~ "The room contains: voyage"
+
+    assert {:ok, msg} = tcp_recv(socket1)
+
+    assert msg =~ "haxius has entered the room"
   end
 
-  defp create_query_payload(min_timestamp, max_timestamp) do
-    <<"Q", min_timestamp::size(32), max_timestamp::size(32)>>
+  test "should handle multiple users & broadcast message to other users" do
+    assert {:ok, socket1} = tcp_connect()
+    tcp_disconnect_on_exit(socket1)
+
+    assert {:ok, _} = tcp_recv(socket1)
+    assert :ok = tcp_send(socket1, with_newline("voyage"))
+    assert {:ok, _} = tcp_recv(socket1)
+
+    assert {:ok, socket2} = tcp_connect()
+    tcp_disconnect_on_exit(socket2)
+
+    assert {:ok, _} = tcp_recv(socket2)
+    assert :ok = tcp_send(socket2, with_newline("haxius"))
+    assert {:ok, _} = tcp_recv(socket2)
+
+    assert {:ok, _} = tcp_recv(socket1)
+
+    assert :ok = tcp_send(socket1, with_newline("Hello"))
+    assert {:ok, msg} = tcp_recv(socket2)
+
+    assert msg =~ "[voyage] Hello"
+
+    assert :ok = tcp_send(socket2, with_newline("Hey"))
+    assert {:ok, msg} = tcp_recv(socket1)
+
+    assert msg =~ "[haxius] Hey"
   end
+
+  test "should handle messages when user leaves the room" do
+    assert {:ok, socket1} = tcp_connect()
+    tcp_disconnect_on_exit(socket1)
+
+    assert {:ok, _} = tcp_recv(socket1)
+    assert :ok = tcp_send(socket1, with_newline("voyage"))
+    assert {:ok, _} = tcp_recv(socket1)
+
+    assert {:ok, socket2} = tcp_connect()
+
+    assert {:ok, _} = tcp_recv(socket2)
+    assert :ok = tcp_send(socket2, with_newline("haxius"))
+    assert {:ok, _} = tcp_recv(socket2)
+
+    assert {:ok, _} = tcp_recv(socket1)
+
+    assert :ok = tcp_disconnect(socket2)
+    assert {:ok, msg} = tcp_recv(socket1)
+    assert msg =~ "haxius has left the room"
+  end
+
+  defp tcp_connect,
+    do: :gen_tcp.connect('localhost', @port, active: false)
+
+  defp tcp_disconnect(socket),
+    do: :gen_tcp.close(socket)
+
+  defp tcp_disconnect_on_exit(socket),
+    do: on_exit(fn -> tcp_disconnect(socket) end)
+
+  defp tcp_recv(socket) do
+    case :gen_tcp.recv(socket, 0) do
+      {:ok, data} -> {:ok, to_string(data)}
+      other -> other
+    end
+  end
+
+  defp tcp_send(socket, data) do
+    :gen_tcp.send(socket, data)
+  end
+
+  defp with_newline(data),
+    do: data <> "\n"
 end
