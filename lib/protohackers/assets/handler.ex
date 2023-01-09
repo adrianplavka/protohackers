@@ -18,11 +18,11 @@ defmodule Protohackers.Assets.Handler do
     case state.buffer <> data do
       <<payload::binary-size(9)>> ->
         Process.send(self(), {:payload, payload}, [])
-        {:continue, %{state | buffer: ""}}
+        {:continue, %{state | buffer: <<>>}}
 
       <<payload::binary-size(9), rest::binary>> ->
         Process.send(self(), {:payload, payload}, [])
-        handle_data(rest, socket, %{state | buffer: ""})
+        handle_data(rest, socket, %{state | buffer: <<>>})
 
       data ->
         {:continue, %{state | buffer: data}}
@@ -33,24 +33,23 @@ defmodule Protohackers.Assets.Handler do
   def handle_info({:payload, payload}, {socket, state}) do
     case decode_payload(payload) do
       {:ok, :insert, timestamp, price} ->
-        Logger.info("Inserting payload: timestamp #{timestamp}, price #{price}")
+        Logger.info("Insert payload: timestamp #{timestamp}, price #{price}")
         query_map = QueryMap.insert(state.query_map, timestamp, price)
         {:noreply, {socket, %{state | query_map: query_map}}}
 
       {:ok, :query, min_timestamp, max_timestamp} ->
         Logger.info(
-          "Querying payload: min_timestamp #{min_timestamp}, max_timestamp #{max_timestamp}"
+          "Query payload: min_timestamp #{min_timestamp}, max_timestamp #{max_timestamp}"
         )
 
         query_map = QueryMap.query(state.query_map, min_timestamp, max_timestamp)
-
         total_price = Enum.reduce(query_map, 0, fn {_timestamp, price}, acc -> price + acc end)
         mean_price = floor(total_price / max(QueryMap.length(query_map), 1))
 
         Socket.send(socket, <<mean_price::size(32)>>)
         {:noreply, {socket, state}}
 
-      :error ->
+      _ ->
         Logger.info("Unknown payload: #{inspect(payload)}")
         Socket.close(socket)
         {:stop, :shutdown, {socket, state}}
