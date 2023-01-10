@@ -7,8 +7,11 @@
 # General application configuration
 import Config
 
-# Configure options for the TCP server.
-config :protohackers, tcp_options: [port: 5000]
+# Configure options for the UDP server.
+config :protohackers,
+  udp_options: [
+    port: 5000
+  ]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
