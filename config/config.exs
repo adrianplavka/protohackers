@@ -7,9 +7,9 @@
 # General application configuration
 import Config
 
-# Configure options for the UDP server.
+# Configure options for the TCP server.
 config :protohackers,
-  udp_options: [
+  tcp_options: [
     port: 5000
   ]
 
